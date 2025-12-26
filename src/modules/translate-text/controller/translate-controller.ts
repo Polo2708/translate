@@ -1,30 +1,39 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTranslateStore } from "../../../store/translate-store";
-
-type TextSelectedMessage = {
-  type: "TEXT_SELECTED";
-  payload: string;
-};
 
 export const useTranslateController = () => {
   const { textTranslate, translateLanguage } = useTranslateStore();
+  const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
-    const handler = (msg: TextSelectedMessage) => {
-      if (msg?.type === "TEXT_SELECTED") {
-        console.log("Texto recibido:", msg.payload);
-        translateLanguage(msg.payload);
+    if (!chrome?.storage) return;
+
+    const handleChange = async (
+      changes: { [key: string]: chrome.storage.StorageChange },
+      area: string
+    ) => {
+      if (area === "local" && changes.selectedText?.newValue) {
+        setLoading(true);
+        await translateLanguage(changes.selectedText.newValue);
+        setLoading(false);
       }
     };
 
-    chrome.runtime.onMessage.addListener(handler);
+    chrome.storage.onChanged.addListener(handleChange);
 
     return () => {
-      chrome.runtime.onMessage.removeListener(handler);
+      chrome.storage.onChanged.removeListener(handleChange);
     };
   }, [translateLanguage]);
 
+  const refreshText = () => {
+    setLoading((prev) => !prev);
+  };
+
   return {
     textTranslate,
+    loading,
+    refreshText,
+    setLoading,
   };
 };
